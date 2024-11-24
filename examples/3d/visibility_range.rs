@@ -108,7 +108,7 @@ fn setup(
     commands.spawn((
         SceneRoot(
             asset_server
-                .load(GltfAssetLabel::Scene(0).from_asset("models/FlightHelmet/FlightHelmet.gltf")),
+                .load(GltfAssetLabel::scene("#0").from_asset("models/FlightHelmet/FlightHelmet.gltf")),
         ),
         MainModel::HighPoly,
     ));
@@ -116,7 +116,7 @@ fn setup(
     commands.spawn((
         SceneRoot(
             asset_server.load(
-                GltfAssetLabel::Scene(0)
+                GltfAssetLabel::scene("Scene")
                     .from_asset("models/FlightHelmetLowPoly/FlightHelmetLowPoly.gltf"),
             ),
         ),

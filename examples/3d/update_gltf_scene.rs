@@ -39,7 +39,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         Transform::from_xyz(-1.0, 0.0, 0.0),
         SceneRoot(
             asset_server
-                .load(GltfAssetLabel::Scene(0).from_asset("models/FlightHelmet/FlightHelmet.gltf")),
+                .load(GltfAssetLabel::scene("#0").from_asset("models/FlightHelmet/FlightHelmet.gltf")),
         ),
     ));
 
@@ -47,7 +47,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
         SceneRoot(
             asset_server
-                .load(GltfAssetLabel::Scene(0).from_asset("models/FlightHelmet/FlightHelmet.gltf")),
+                .load(GltfAssetLabel::scene("#0").from_asset("models/FlightHelmet/FlightHelmet.gltf")),
         ),
         MovedScene,
     ));

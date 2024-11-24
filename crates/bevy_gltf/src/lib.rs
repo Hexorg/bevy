@@ -92,6 +92,8 @@
 
 extern crate alloc;
 
+use std::borrow::Cow;
+
 #[cfg(feature = "bevy_animation")]
 use bevy_animation::AnimationClip;
 use bevy_utils::HashMap;
@@ -166,6 +168,14 @@ impl Plugin for GltfPlugin {
             supported_compressed_formats,
             custom_vertex_attributes: self.custom_vertex_attributes.clone(),
         });
+    }
+}
+
+fn gltf_nameless_name_generator(name:Option<&str>, index:usize, kind:&'static str) -> String {
+    if let Some(name) = name {
+        name.to_owned()
+    } else {
+        format!("{}{}", kind, index)
     }
 }
 
@@ -268,7 +278,7 @@ impl GltfNode {
 
     /// Subasset label for this node within the gLTF parent asset.
     pub fn asset_label(&self) -> GltfAssetLabel {
-        GltfAssetLabel::Node(self.index)
+        GltfAssetLabel::Node(self.name.clone().into())
     }
 }
 
@@ -313,7 +323,7 @@ impl GltfSkin {
 
     /// Subasset label for this skin within the gLTF parent asset.
     pub fn asset_label(&self) -> GltfAssetLabel {
-        GltfAssetLabel::Skin(self.index)
+        GltfAssetLabel::Skin(self.name.clone().into())
     }
 }
 
@@ -342,11 +352,7 @@ impl GltfMesh {
     ) -> Self {
         Self {
             index: mesh.index(),
-            name: if let Some(name) = mesh.name() {
-                name.to_string()
-            } else {
-                format!("GltfMesh{}", mesh.index())
-            },
+            name: gltf_nameless_name_generator(mesh.name(), mesh.index(), "GltfMesh"),
             primitives,
             extras,
         }
@@ -354,7 +360,7 @@ impl GltfMesh {
 
     /// Subasset label for this mesh within the gLTF parent asset.
     pub fn asset_label(&self) -> GltfAssetLabel {
-        GltfAssetLabel::Mesh(self.index)
+        GltfAssetLabel::Mesh(self.name.clone().into())
     }
 }
 
@@ -365,10 +371,8 @@ impl GltfMesh {
 pub struct GltfPrimitive {
     /// Index of the primitive inside the mesh
     pub index: usize,
-    /// Index of the parent [`GltfMesh`] of this primitive
-    pub parent_mesh_index: usize,
-    /// Computed name for a primitive - either a user defined primitive name from gLTF or a generated name from index
-    pub name: String,
+    /// Name of the parent [`GltfMesh`] of this primitive
+    pub parent_mesh_name: String,
     /// Topology to be rendered.
     pub mesh: Handle<Mesh>,
     /// Material to apply to the `mesh`.
@@ -391,15 +395,7 @@ impl GltfPrimitive {
     ) -> Self {
         GltfPrimitive {
             index: gltf_primitive.index(),
-            parent_mesh_index: gltf_mesh.index(),
-            name: {
-                let mesh_name = gltf_mesh.name().unwrap_or("Mesh");
-                if gltf_mesh.primitives().len() > 1 {
-                    format!("{}.{}", mesh_name, gltf_primitive.index())
-                } else {
-                    mesh_name.to_string()
-                }
-            },
+            parent_mesh_name: gltf_nameless_name_generator(gltf_mesh.name(), gltf_mesh.index(), "Mesh"),
             mesh,
             material,
             extras,
@@ -410,7 +406,7 @@ impl GltfPrimitive {
     /// Subasset label for this primitive within its parent [`GltfMesh`] within the gLTF parent asset.
     pub fn asset_label(&self) -> GltfAssetLabel {
         GltfAssetLabel::Primitive {
-            mesh: self.parent_mesh_index,
+            mesh: self.parent_mesh_name.clone().into(),
             primitive: self.index,
         }
     }
@@ -490,76 +486,76 @@ pub struct GltfMaterialName(pub String);
 ///     let gltf_scene: Handle<Scene> = asset_server.load(format!("models/FlightHelmet/FlightHelmet.gltf#{}", GltfAssetLabel::Scene(0)));
 /// }
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GltfAssetLabel {
-    /// `Scene{}`: glTF Scene as a Bevy `Scene`
-    Scene(usize),
-    /// `Node{}`: glTF Node as a `GltfNode`
-    Node(usize),
-    /// `Mesh{}`: glTF Mesh as a `GltfMesh`
-    Mesh(usize),
-    /// `Mesh{}/Primitive{}`: glTF Primitive as a Bevy `Mesh`
+    /// `Scene:{name}`: glTF Scene as a Bevy `Scene`
+    Scene(Cow<'static, str>),
+    /// `Node:{name}`: glTF Node as a `GltfNode`
+    Node(Cow<'static, str>),
+    /// `Mesh:{name}`: glTF Mesh as a `GltfMesh`
+    Mesh(Cow<'static, str>),
+    /// `Mesh:{name}/Primitive{id}`: glTF Primitive as a Bevy `Mesh`
     Primitive {
         /// Index of the mesh for this primitive
-        mesh: usize,
+        mesh: Cow<'static, str>,
         /// Index of this primitive in its parent mesh
         primitive: usize,
     },
-    /// `Mesh{}/Primitive{}/MorphTargets`: Morph target animation data for a glTF Primitive
+    /// `Mesh:{name}/Primitive{id}/MorphTargets`: Morph target animation data for a glTF Primitive
     MorphTarget {
         /// Index of the mesh for this primitive
-        mesh: usize,
+        mesh: Cow<'static, str>,
         /// Index of this primitive in its parent mesh
         primitive: usize,
     },
-    /// `Texture{}`: glTF Texture as a Bevy `Image`
-    Texture(usize),
-    /// `Material{}`: glTF Material as a Bevy `StandardMaterial`
+    /// `Texture:{name}`: glTF Texture as a Bevy `Image`
+    Texture(Cow<'static, str>),
+    /// `Material:{name}`: glTF Material as a Bevy `StandardMaterial`
     Material {
         /// Index of this material
-        index: usize,
+        name: Cow<'static, str>,
         /// Used to set the [`Face`](bevy_render::render_resource::Face) of the material, useful if it is used with negative scale
         is_scale_inverted: bool,
     },
     /// `DefaultMaterial`: as above, if the glTF file contains a default material with no index
     DefaultMaterial,
-    /// `Animation{}`: glTF Animation as Bevy `AnimationClip`
-    Animation(usize),
-    /// `Skin{}`: glTF mesh skin as `GltfSkin`
-    Skin(usize),
-    /// `Skin{}/InverseBindMatrices`: glTF mesh skin matrices as Bevy `SkinnedMeshInverseBindposes`
-    InverseBindMatrices(usize),
+    /// `Animation:{name}`: glTF Animation as Bevy `AnimationClip`
+    Animation(Cow<'static, str>),
+    /// `Skin:{name}`: glTF mesh skin as `GltfSkin`
+    Skin(Cow<'static, str>),
+    /// `Skin:{name}/InverseBindMatrices`: glTF mesh skin matrices as Bevy `SkinnedMeshInverseBindposes`
+    InverseBindMatrices(Cow<'static, str>),
 }
 
 impl core::fmt::Display for GltfAssetLabel {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            GltfAssetLabel::Scene(index) => f.write_str(&format!("Scene{index}")),
-            GltfAssetLabel::Node(index) => f.write_str(&format!("Node{index}")),
-            GltfAssetLabel::Mesh(index) => f.write_str(&format!("Mesh{index}")),
+            GltfAssetLabel::Scene(name) => f.write_str(&format!("Scene:{name}")),
+            GltfAssetLabel::Node(name) => f.write_str(&format!("Node:{name}")),
+            GltfAssetLabel::Mesh(name) => f.write_str(&format!("Mesh:{name}")),
             GltfAssetLabel::Primitive { mesh, primitive } => {
-                f.write_str(&format!("Mesh{mesh}/Primitive{primitive}"))
+                f.write_str(&format!("Mesh:{mesh}/Primitive{primitive}"))
             }
             GltfAssetLabel::MorphTarget { mesh, primitive } => {
-                f.write_str(&format!("Mesh{mesh}/Primitive{primitive}/MorphTargets"))
+                f.write_str(&format!("Mesh:{mesh}/Primitive{primitive}/MorphTargets"))
             }
-            GltfAssetLabel::Texture(index) => f.write_str(&format!("Texture{index}")),
+            GltfAssetLabel::Texture(name) => f.write_str(name),
             GltfAssetLabel::Material {
-                index,
+                name,
                 is_scale_inverted,
-            } => f.write_str(&format!(
-                "Material{index}{}",
-                if *is_scale_inverted {
+            } => { 
+                f.write_str(&format!("Texture:{name}"))?;
+                f.write_str(if *is_scale_inverted {
                     " (inverted)"
                 } else {
                     ""
-                }
-            )),
+                })
+            },
             GltfAssetLabel::DefaultMaterial => f.write_str("DefaultMaterial"),
-            GltfAssetLabel::Animation(index) => f.write_str(&format!("Animation{index}")),
-            GltfAssetLabel::Skin(index) => f.write_str(&format!("Skin{index}")),
-            GltfAssetLabel::InverseBindMatrices(index) => {
-                f.write_str(&format!("Skin{index}/InverseBindMatrices"))
+            GltfAssetLabel::Animation(name) => f.write_str(&format!("Animation:{name}")),
+            GltfAssetLabel::Skin(name) => f.write_str(&format!("Skin:{name}")),
+            GltfAssetLabel::InverseBindMatrices(name) => {
+                f.write_str(&format!("Skin:{name}/InverseBindMatrices"))
             }
         }
     }
@@ -581,4 +577,50 @@ impl GltfAssetLabel {
     pub fn from_asset(&self, path: impl Into<AssetPath<'static>>) -> AssetPath<'static> {
         path.into().with_label(self.to_string())
     }
+
+    /// Helper method for creating gltf scene asset label
+    pub fn scene(name:impl Into<Cow<'static, str>>) -> Self {
+        Self::Scene(name.into())
+    }
+
+    /// Helper method for creating gltf node asset label
+    pub fn node(name:impl Into<Cow<'static, str>>) -> Self {
+        Self::Node(name.into())
+    }
+
+    /// Helper method for creating gltf mesh asset label
+    pub fn mesh(name:impl Into<Cow<'static, str>>) -> Self {
+        Self::Mesh(name.into())
+    }
+
+    /// Helper method for creating gltf primitive asset label
+    pub fn primitive(mesh:impl Into<Cow<'static, str>>, primitive_index:usize) -> Self {
+        Self::Primitive { mesh: mesh.into(), primitive: primitive_index }
+    }
+
+    /// Helper method for creating gltf morph target asset label
+    pub fn morph_target(mesh:impl Into<Cow<'static, str>>, primitive_index:usize) -> Self {
+        Self::MorphTarget { mesh: mesh.into(), primitive: primitive_index }
+    }
+
+    /// Helper method for creating gltf material asset label
+    pub fn material(name:impl Into<Cow<'static, str>>, is_scale_inverted:bool) -> Self {
+        Self::Material{name:name.into(), is_scale_inverted}
+    }
+
+    /// Helper method for creating gltf animation asset label
+    pub fn animation(name:impl Into<Cow<'static, str>>) -> Self {
+        Self::Animation(name.into())
+    }
+
+    /// Helper method for creating gltf skin asset label
+    pub fn skin(name:impl Into<Cow<'static, str>>) -> Self {
+        Self::Skin(name.into())
+    }
+
+    /// Helper method for creating gltf inverse bind matrices asset label
+    pub fn inverse_bind_matrices(mesh:impl Into<Cow<'static, str>>) -> Self {
+        Self::InverseBindMatrices(mesh.into())
+    }
+
 }

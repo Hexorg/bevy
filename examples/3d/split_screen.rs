@@ -28,7 +28,7 @@ fn setup(
     ));
 
     commands.spawn(SceneRoot(
-        asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/animated/Fox.glb")),
+        asset_server.load(GltfAssetLabel::scene("#0").from_asset("models/animated/Fox.glb")),
     ));
 
     // Light

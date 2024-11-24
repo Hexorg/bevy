@@ -21,17 +21,11 @@ fn setup(
     //
     // This can be overridden by setting [`AssetPlugin.file_path`].
     let cube_handle = asset_server.load(
-        GltfAssetLabel::Primitive {
-            mesh: 0,
-            primitive: 0,
-        }
+        GltfAssetLabel::primitive("Cube", 0)
         .from_asset("models/cube/cube.gltf"),
     );
     let sphere_handle = asset_server.load(
-        GltfAssetLabel::Primitive {
-            mesh: 0,
-            primitive: 0,
-        }
+        GltfAssetLabel::primitive("Sphere", 0)
         .from_asset("models/sphere/sphere.gltf"),
     );
 
@@ -59,10 +53,7 @@ fn setup(
     // The LoadedFolder asset will ultimately also hold handles to the assets, but waiting for it to load
     // and finding the right handle is more work!
     let torus_handle = asset_server.load(
-        GltfAssetLabel::Primitive {
-            mesh: 0,
-            primitive: 0,
-        }
+        GltfAssetLabel::primitive("Torus.001", 0)
         .from_asset("models/torus/torus.gltf"),
     );
 
